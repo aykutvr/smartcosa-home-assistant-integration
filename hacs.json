@@ -3,7 +3,5 @@
     "render_readme": true,
     "content_in_root": false,
     "domain": "cosa_thermostat",
-    "documentation": "https://github.com/aykutvr/smartcosa-home-assistant-integration",
-    "issue_tracker": "https://github.com/aykutvr/smartcosa-home-assistant-integration/issues",
     "homeassistant": "2024.1.0"
 } 
