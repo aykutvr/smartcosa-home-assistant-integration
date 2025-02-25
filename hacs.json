@@ -2,6 +2,5 @@
     "name": "Cosa Thermostat",
     "render_readme": true,
     "content_in_root": false,
-    "domain": "cosa_thermostat",
     "homeassistant": "2024.1.0"
 } 
