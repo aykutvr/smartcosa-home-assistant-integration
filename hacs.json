@@ -1,7 +1,8 @@
 {
     "name": "Cosa Thermostat",
     "render_readme": true,
-    "domains": ["climate", "sensor"],
-    "homeassistant": "2024.1.0",
-    "iot_class": "Cloud Polling"
+    "domain": "cosa_thermostat",
+    "documentation": "https://github.com/aykutvr/smartcosa-home-assistant-integration",
+    "issue_tracker": "https://github.com/aykutvr/smartcosa-home-assistant-integration/issues",
+    "homeassistant": "2024.1.0"
 } 
