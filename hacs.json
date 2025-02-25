@@ -1,0 +1,7 @@
+{
+    "name": "Cosa Thermostat",
+    "render_readme": true,
+    "domains": ["climate", "sensor"],
+    "homeassistant": "2024.1.0",
+    "iot_class": "Cloud Polling"
+} 
