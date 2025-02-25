@@ -1,0 +1,14 @@
+{
+  "domain": "cosa_thermostat",
+  "name": "Cosa Thermostat",
+  "version": "1.0.0",
+  "documentation": "https://github.com/aykutvr/smartcosa-home-assistant-integration",
+  "issue_tracker": "https://github.com/aykutvr/smartcosa-home-assistant-integration/issues",
+  "dependencies": [],
+  "codeowners": ["@aykutvr"],
+  "iot_class": "cloud_polling",
+  "config_flow": true,
+  "requirements": ["aiohttp"],
+  "homeassistant": "2024.1.0",
+  "integration_type": "hub"
+} 

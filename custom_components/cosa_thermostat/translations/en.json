@@ -1,0 +1,41 @@
+{
+    "entity": {
+        "climate": {
+            "cosa_thermostat": {
+                "state_attributes": {
+                    "preset_mode": {
+                        "state": {
+                            "home": "Home",
+                            "sleep": "Sleep",
+                            "away": "Away",
+                            "custom": "Custom",
+                            "auto": "Auto Control",
+                            "schedule": "Weekly Schedule"
+                        }
+                    }
+                }
+                
+            }
+        },
+        "sensor": {
+            "combi_state": {
+                "name": "Combi State",
+                "state": {
+                    "heating": "Heating",
+                    "idle": "Idle",
+                    "off": "Off",
+                    "unknown": "Unknown"
+                }
+            },
+            "current_temperature": {
+                "name": "Current Temperature"
+            },
+            "target_temperature": {
+                "name": "Target Temperature"
+            },
+            "humidity": {
+                "name": "Humidity"
+            }
+        }
+    }
+}

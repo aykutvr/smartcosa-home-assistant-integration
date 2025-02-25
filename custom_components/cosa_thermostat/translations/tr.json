@@ -1,0 +1,41 @@
+{
+    "entity": {
+        "climate": {
+            "cosa_thermostat": {
+                "state_attributes": {
+                    "preset_mode": {
+                        "state": {
+                            "home": "Ev",
+                        "sleep": "Uyku",
+                        "away": "Dışarı",
+                        "custom": "Kullanıcı",
+                        "auto": "Otomatik Kontrol",
+                        "schedule": "Haftalık Program"
+                        }
+                    }
+                }
+                
+            }
+        },
+        "sensor": {
+            "combi_state": {
+                "name": "Kombi Durumu",
+                "state": {
+                    "heating": "Isıtıyor",
+                    "idle": "Beklemede",
+                    "off": "Kapalı",
+                    "unknown": "Bilinmiyor"
+                }
+            },
+            "current_temperature": {
+                "name": "Mevcut Sıcaklık"
+            },
+            "target_temperature": {
+                "name": "Hedef Sıcaklık"
+            },
+            "humidity": {
+                "name": "Nem Oranı"
+            }
+        }
+    }
+}
