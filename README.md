@@ -80,4 +80,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Disclaimer
 
-This integration is not officially associated with Cosa. Use at your own risk. 
+This integration is not officially associated with Cosa. Use at your own risk.
+
+## Documentation
+
+For more information, please visit the GitHub repository: [https://github.com/aykutvr/smartcosa-home-assistant-integration](https://github.com/aykutvr/smartcosa-home-assistant-integration) 
