@@ -1,11 +1,11 @@
 {
-  "domain": "cosa_thermostat",
-  "name": "Cosa Smart Thermostat",
-  "version": "1.0.0",
-  "documentation": "https://github.com/aykutvr/cosa_thermostat",
-  "dependencies": [],
   "codeowners": ["@aykutvr"],
-  "iot_class": "cloud_polling",
   "config_flow": true,
-  "requirements": ["aiohttp"]
+  "dependencies": [],
+  "documentation": "https://github.com/aykutvr/cosa_thermostat",
+  "domain": "cosa_thermostat",
+  "iot_class": "cloud_polling",
+  "name": "Cosa Smart Thermostat",
+  "requirements": ["aiohttp"],
+  "version": "1.0.0"
 } 
