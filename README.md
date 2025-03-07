@@ -40,8 +40,9 @@ This is a custom integration for Home Assistant that allows you to control your 
 2. Click "Add Integration"
 3. Search for "Cosa Thermostat"
 4. Follow the configuration steps:
-   - Enter your device ID
-   - Enter your authentication token
+   - Enter your Email Address
+   - Enter your Password
+   - Choose your home endpoint
 
 ## Supported Features
 

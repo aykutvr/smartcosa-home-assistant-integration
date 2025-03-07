@@ -2,7 +2,7 @@
 from homeassistant.const import Platform
 
 DOMAIN = "cosa_thermostat"
-PLATFORMS = [Platform.CLIMATE, Platform.SENSOR]
+PLATFORMS = [Platform.CLIMATE]
 
 # Configuration
 CONF_EMAIL = "email"

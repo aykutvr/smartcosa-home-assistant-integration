@@ -1,5 +1,4 @@
 """The Cosa Thermostat integration."""
-from __future__ import annotations
 from datetime import timedelta
 import logging
 import aiohttp
@@ -18,13 +17,11 @@ from .const import (
     DOMAIN,
     API_BASE_URL,
     API_GET_ENDPOINT,
-    PLATFORMS,
 )
 
 _LOGGER = logging.getLogger(__name__)
+PLATFORMS: list[str] = ["climate", "sensor"]
 UPDATE_INTERVAL = timedelta(seconds=10)
-
-PLATFORMS: list[Platform] = [Platform.CLIMATE, Platform.SENSOR]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Cosa Thermostat from a config entry."""
@@ -81,4 +78,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS) 
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id)
+
+    return unload_ok 
