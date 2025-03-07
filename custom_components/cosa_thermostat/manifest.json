@@ -1,8 +1,8 @@
 {
   "domain": "cosa_thermostat",
   "name": "Cosa Smart Thermostat",
-  "config_flow": true,
   "codeowners": ["@aykutvr"],
+  "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/aykutvr/smartcosa-home-assistant-integration",
   "integration_type": "hub",
