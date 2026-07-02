@@ -13,6 +13,10 @@ This is a custom integration for Home Assistant that allows you to control your 
   - Schedule mode
 - Real-time status updates
 - Supports both heating control and monitoring
+- **Air conditioner (AC) control** on AC-capable Cosa devices (models with
+  "AC" in the product code, e.g. P4TR-21-AC): a separate climate entity with
+  cool / heat / dry / fan-only modes and fan speed control, using the
+  thermostat's built-in IR remote capability
 
 ## Installation
 
@@ -46,7 +50,7 @@ This is a custom integration for Home Assistant that allows you to control your 
 
 ## Supported Features
 
-### Climate Entity
+### Climate Entity (Combi / Boiler)
 
 - Current temperature display
 - Current humidity display
@@ -62,11 +66,31 @@ This is a custom integration for Home Assistant that allows you to control your 
   - Auto
   - Schedule
 
+### Climate Entity (Air Conditioner)
+
+Created automatically for AC-capable devices (the Cosa app must be paired
+with your AC via Settings > AC Settings first):
+
+- HVAC modes: Cool, Heat, Dry, Fan only, Off
+- Fan speeds: Auto, Low, Medium, High
+- Target temperature control (16–30 °C)
+- Switching the AC on automatically takes the device out of combi mode
+  (and vice versa) — the device enforces this itself
+
+Note: IR control is one-way (like a remote), so the state shown reflects
+the last command sent through Cosa, not changes made with the AC's own
+remote control.
+
+If you pair your AC in the Cosa app *after* adding this integration,
+reload the integration (Settings > Devices & Services > Cosa Thermostat >
+Reload) for the AC entity to appear.
+
 ### Sensors
 
 - Temperature sensor
 - Humidity sensor
 - Operation state sensor
+- AC state sensor (AC-capable devices)
 
 ## Contributing
 

@@ -14,7 +14,6 @@
                         }
                     }
                 }
-                
             }
         },
         "sensor": {
@@ -23,6 +22,17 @@
                 "state": {
                     "heating": "Heating",
                     "idle": "Idle",
+                    "off": "Off",
+                    "unknown": "Unknown"
+                }
+            },
+            "ac_state": {
+                "name": "AC State",
+                "state": {
+                    "cooling": "Cooling",
+                    "heating": "Heating",
+                    "dry": "Dry",
+                    "ventilation": "Fan",
                     "off": "Off",
                     "unknown": "Unknown"
                 }
