@@ -21,6 +21,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import DOMAIN
+from .climate import has_ac_support, parse_ac_state
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -57,6 +58,17 @@ SENSORS = [
     ),
 ]
 
+# Yalnızca klima destekli cihazlara eklenen sensörler
+AC_SENSORS = [
+    SensorEntityDescription(
+        key="ac_state",
+        translation_key="ac_state",
+        device_class=SensorDeviceClass.ENUM,
+        options=["cooling", "heating", "dry", "ventilation", "off", "unknown"],
+        icon="mdi:air-conditioner",
+    ),
+]
+
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
@@ -77,7 +89,19 @@ async def async_setup_entry(
                     device_id
                 )
             )
-        
+
+        # Klima destekli cihazlarda AC sensörlerini de ekle
+        endpoint = (coordinator.data or {}).get("endpoint", {})
+        if has_ac_support(endpoint):
+            for description in AC_SENSORS:
+                entities.append(
+                    CosaThermostatSensor(
+                        coordinator,
+                        description,
+                        device_id
+                    )
+                )
+
         async_add_entities(entities, False)
         _LOGGER.debug("Added %s sensor entities", len(entities))
         
@@ -141,7 +165,14 @@ class CosaThermostatSensor(CoordinatorEntity, SensorEntity):
             elif self.entity_description.key == "humidity":
                 humidity = endpoint.get("humidity")
                 return float(humidity) if humidity is not None else None
-                
+
+            elif self.entity_description.key == "ac_state":
+                parsed = parse_ac_state(endpoint.get("acState"))
+                if parsed is None:
+                    return "unknown"
+                # "cooling", "heating", "dry", "ventilation" veya "off"
+                return parsed[0]
+
         except Exception as ex:
             _LOGGER.error(
                 "Error getting value for sensor %s: %s",

@@ -6,15 +6,14 @@
                     "preset_mode": {
                         "state": {
                             "home": "Ev",
-                        "sleep": "Uyku",
-                        "away": "Dışarı",
-                        "custom": "Kullanıcı",
-                        "auto": "Otomatik Kontrol",
-                        "schedule": "Haftalık Program"
+                            "sleep": "Uyku",
+                            "away": "Dışarı",
+                            "custom": "Kullanıcı",
+                            "auto": "Otomatik Kontrol",
+                            "schedule": "Haftalık Program"
                         }
                     }
                 }
-                
             }
         },
         "sensor": {
@@ -23,6 +22,17 @@
                 "state": {
                     "heating": "Isıtıyor",
                     "idle": "Beklemede",
+                    "off": "Kapalı",
+                    "unknown": "Bilinmiyor"
+                }
+            },
+            "ac_state": {
+                "name": "Klima Durumu",
+                "state": {
+                    "cooling": "Soğutuyor",
+                    "heating": "Isıtıyor",
+                    "dry": "Nem Alma",
+                    "ventilation": "Fan",
                     "off": "Kapalı",
                     "unknown": "Bilinmiyor"
                 }
