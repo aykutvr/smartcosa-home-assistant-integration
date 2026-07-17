@@ -77,6 +77,34 @@ with your AC via Settings > AC Settings first):
 - Switching the AC on automatically takes the device out of combi mode
   (and vice versa) — the device enforces this itself
 
+#### Preset modes (AC)
+
+- **Remote** — Cosa acts as a plain IR remote: you pick the mode, fan speed
+  and temperature, and the command is sent straight to the AC. This is the
+  only mode that offers dry and fan-only.
+- **Home / Away / Sleep / Custom / Auto Control / Weekly Schedule** — the
+  thermostat drives the AC itself, switching it on and off to reach the
+  preset's target temperature, exactly like it does with the combi. In these
+  presets the AC state reported by Home Assistant reflects whether the device
+  is actually cooling.
+
+> **The preset temperatures are shared with the combi.** Cosa stores one target
+> temperature per preset (home/away/sleep/custom) and uses it for whichever
+> system is active. Changing the AC's Home target to 24 °C also changes the
+> combi's Home target to 24 °C — there are no separate cooling setpoints. The
+> Cosa app behaves the same way.
+
+#### Known limitations
+
+- **No swing (louver) control.** The Cosa cloud API exposes no command for it
+  and the Cosa app has no swing button either, even though the IR profile
+  contains a `SWING` key. This is a limitation of Cosa, not of this
+  integration.
+- **The AC beeps twice on some changes.** When the fan speed is anything other
+  than "auto", the thermostat has to send a second IR key for the fan, so the
+  AC beeps twice. The Cosa app does exactly the same — it is device behaviour,
+  not a bug.
+
 Note: IR control is one-way (like a remote), so the state shown reflects
 the last command sent through Cosa, not changes made with the AC's own
 remote control.

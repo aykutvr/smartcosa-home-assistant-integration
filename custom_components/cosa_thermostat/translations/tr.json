@@ -14,6 +14,21 @@
                         }
                     }
                 }
+            },
+            "cosa_air_conditioner": {
+                "state_attributes": {
+                    "preset_mode": {
+                        "state": {
+                            "remote": "Kumanda",
+                            "home": "Ev",
+                            "away": "Dışarı",
+                            "sleep": "Uyku",
+                            "custom": "Kullanıcı",
+                            "auto": "Otomatik Kontrol",
+                            "schedule": "Haftalık Program"
+                        }
+                    }
+                }
             }
         },
         "sensor": {
