@@ -53,3 +53,21 @@ AC_FAN_MODES = ["auto", "low", "medium", "high"]
 AC_MIN_TEMP = 16
 AC_MAX_TEMP = 30
 AC_DEFAULT_TARGET_TEMP = 24
+
+API_SET_AC_SETTINGS = "/api/endpoints/setACSettings"
+
+# AC preset modes (klima entity'si)
+# "remote" = Kumanda: IR passthrough (operationMode=remote)
+# diğerleri = termostatik klima kontrolü (operationMode=cooling)
+AC_PRESET_REMOTE = "remote"
+AC_THERMOSTAT_PRESETS = ["home", "away", "sleep", "custom"]
+AC_SCHEDULING_PRESETS = ["auto", "schedule"]
+AC_PRESET_MODES = [AC_PRESET_REMOTE] + AC_THERMOSTAT_PRESETS + AC_SCHEDULING_PRESETS
+
+# setACSettings'e geri yazılmayacak salt-okunur alanlar
+AC_SETTINGS_READ_ONLY_KEYS = ("keys", "acInfo", "acDeviceType")
+
+# Termostatik moddaki hedef sıcaklık aralığı (kombi ile ORTAK alanlar)
+AC_THERMOSTAT_MIN_TEMP = 5
+AC_THERMOSTAT_MAX_TEMP = 35
+AC_THERMOSTAT_TEMP_STEP = 0.1

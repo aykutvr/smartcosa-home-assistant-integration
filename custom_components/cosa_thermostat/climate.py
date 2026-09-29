@@ -35,8 +35,11 @@ from .const import (
     API_SET_OPTION,
     API_SET_OPERATION_MODE,
     API_SEND_IR_COMMAND,
+    API_SET_AC_SETTINGS,
     OPERATION_MODE_HEATING,
+    OPERATION_MODE_COOLING,
     OPERATION_MODE_REMOTE,
+    OPTION_FROZEN,
     AC_STATE_OFF,
     AC_STATE_DRY,
     AC_STATE_VENTILATION,
@@ -46,70 +49,21 @@ from .const import (
     AC_MIN_TEMP,
     AC_MAX_TEMP,
     AC_DEFAULT_TARGET_TEMP,
+    AC_PRESET_REMOTE,
+    AC_PRESET_MODES,
+    AC_THERMOSTAT_PRESETS,
+    AC_SCHEDULING_PRESETS,
+    AC_SETTINGS_READ_ONLY_KEYS,
+    AC_THERMOSTAT_MIN_TEMP,
+    AC_THERMOSTAT_MAX_TEMP,
+    AC_THERMOSTAT_TEMP_STEP,
 )
+from .helpers import async_api_post, has_ac_support, parse_ac_state
 
 _LOGGER = logging.getLogger(__name__)
 
 # Her 30 saniyede bir güncelleme yap
 SCAN_INTERVAL = timedelta(seconds=10)
-
-
-def has_ac_support(endpoint: dict) -> bool:
-    """Return True if the endpoint controls an air conditioner (IR remote)."""
-    ac_settings = endpoint.get("acSettings") or {}
-    return bool(
-        ac_settings.get("acDeviceType")
-        or ac_settings.get("remoteBrand")
-        or endpoint.get("acState") is not None
-    )
-
-
-def parse_ac_state(raw: str | None) -> tuple[str, str | None, float | None] | None:
-    """Parse an acState string into (mode, fan, temperature).
-
-    Observed values: "off", "dry", "ventilation",
-    "cooling_<fan>_<temp>" and "heating_<fan>_<temp>"
-    where fan is one of auto/low/medium/high.
-    Returns None for unknown/garbage values (the API echoes
-    whatever string was last sent to sendIRCommand).
-    """
-    if not raw or raw == AC_STATE_OFF:
-        return (AC_STATE_OFF, None, None)
-    if raw == AC_STATE_DRY:
-        return (AC_STATE_DRY, None, None)
-    if raw == AC_STATE_VENTILATION:
-        return (AC_STATE_VENTILATION, None, None)
-
-    parts = raw.split("_")
-    if len(parts) == 3 and parts[0] in (AC_MODE_COOLING, AC_MODE_HEATING) and parts[1] in AC_FAN_MODES:
-        try:
-            return (parts[0], parts[1], float(parts[2]))
-        except ValueError:
-            return None
-    return None
-
-
-async def async_api_post(hass: HomeAssistant, auth_token: str, path: str, data: dict) -> bool:
-    """POST to the Cosa API, return True on HTTP 200."""
-    session = async_get_clientsession(hass)
-    headers = {"authToken": auth_token}
-    try:
-        async with session.post(
-            f"{API_BASE_URL}{path}",
-            headers=headers,
-            json=data
-        ) as response:
-            if response.status == 200:
-                return True
-            _LOGGER.error(
-                "API call %s failed. Status: %s, Response: %s",
-                path,
-                response.status,
-                await response.text()
-            )
-    except Exception as ex:
-        _LOGGER.error("API call %s failed: %s", path, ex)
-    return False
 
 
 async def async_setup_entry(
@@ -161,7 +115,7 @@ class CosaThermostat(CoordinatorEntity, ClimateEntity):
     _attr_precision = 0.1
     _attr_hvac_modes = [HVACMode.HEAT, HVACMode.OFF]
     _attr_preset_modes = ["home", "sleep", "away", "custom","auto","schedule"]
-    _attr_translation_key = "preset_mode"
+    _attr_translation_key = "cosa_thermostat"
     _attr_min_temp = 5
     _attr_max_temp = 35
     _attr_target_temperature_step = 0.1
@@ -571,9 +525,6 @@ class CosaAirConditioner(CoordinatorEntity, ClimateEntity):
     _attr_has_entity_name = True
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_precision = 1.0
-    _attr_target_temperature_step = 1
-    _attr_min_temp = AC_MIN_TEMP
-    _attr_max_temp = AC_MAX_TEMP
     _attr_hvac_modes = [
         HVACMode.OFF,
         HVACMode.COOL,
@@ -582,9 +533,12 @@ class CosaAirConditioner(CoordinatorEntity, ClimateEntity):
         HVACMode.FAN_ONLY,
     ]
     _attr_fan_modes = AC_FAN_MODES
+    _attr_preset_modes = AC_PRESET_MODES
+    _attr_translation_key = "cosa_air_conditioner"
     _attr_supported_features = (
         ClimateEntityFeature.TARGET_TEMPERATURE |
         ClimateEntityFeature.FAN_MODE |
+        ClimateEntityFeature.PRESET_MODE |
         ClimateEntityFeature.TURN_ON |
         ClimateEntityFeature.TURN_OFF
     )
@@ -618,10 +572,41 @@ class CosaAirConditioner(CoordinatorEntity, ClimateEntity):
         # Kapalıyken tekrar açmak için son aktif komut
         self._last_active_command: str | None = None
 
+        # Preset durumu
+        self._attr_preset_mode = AC_PRESET_REMOTE
+        self._attr_previous_preset_mode = "home"
+        # Preset başına hedef sıcaklıklar (kombi ile ORTAK)
+        self._target_temperatures: dict[str, float | None] = {
+            "home": None,
+            "away": None,
+            "sleep": None,
+            "custom": None,
+        }
+
     @property
     def available(self) -> bool:
         """Return if entity is available."""
         return self.coordinator.last_update_success
+
+    @property
+    def _is_thermostat_mode(self) -> bool:
+        """Termostatik (cooling) modda mı, kumanda (remote) modunda mı?"""
+        return self._attr_preset_mode != AC_PRESET_REMOTE
+
+    @property
+    def min_temp(self) -> float:
+        """Kumanda modunda IR aralığı, termostatik modda kombi aralığı."""
+        return AC_THERMOSTAT_MIN_TEMP if self._is_thermostat_mode else AC_MIN_TEMP
+
+    @property
+    def max_temp(self) -> float:
+        """Kumanda modunda IR aralığı, termostatik modda kombi aralığı."""
+        return AC_THERMOSTAT_MAX_TEMP if self._is_thermostat_mode else AC_MAX_TEMP
+
+    @property
+    def target_temperature_step(self) -> float:
+        """Kumanda modunda 1°, termostatik modda 0.1° (kombi ile aynı)."""
+        return AC_THERMOSTAT_TEMP_STEP if self._is_thermostat_mode else 1
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -645,15 +630,85 @@ class CosaAirConditioner(CoordinatorEntity, ClimateEntity):
         self._attr_current_temperature = endpoint.get("temperature")
         self._attr_current_humidity = endpoint.get("humidity")
 
+        # Preset sıcaklıkları kombi ile ortaktır
+        self._target_temperatures = {
+            "home": endpoint.get("homeTemperature"),
+            "away": endpoint.get("awayTemperature"),
+            "sleep": endpoint.get("sleepTemperature"),
+            "custom": endpoint.get("customTemperature"),
+        }
+
         operation_mode = endpoint.get("operationMode")
         raw_ac_state = endpoint.get("acState")
-        parsed = parse_ac_state(raw_ac_state)
 
         _LOGGER.debug(
-            "AC update - operationMode: %s, acState: %s, parsed: %s",
-            operation_mode, raw_ac_state, parsed
+            "AC update - operationMode: %s, acState: %s, option: %s, mode: %s",
+            operation_mode, raw_ac_state, endpoint.get("option"), endpoint.get("mode")
         )
 
+        if operation_mode == OPERATION_MODE_HEATING:
+            # Cihaz kombi kontrolünde; klima kapalı
+            self._attr_hvac_mode = HVACMode.OFF
+            self._attr_hvac_action = HVACAction.OFF
+        elif operation_mode == OPERATION_MODE_COOLING:
+            self._process_thermostat_update(endpoint, raw_ac_state)
+        else:
+            # remote (veya operationMode alanı olmayan cihaz)
+            self._process_remote_update(raw_ac_state)
+
+    def _process_thermostat_update(self, endpoint: dict, raw_ac_state: str | None) -> None:
+        """Termostatik klima modu: cihaz klimayı oda sıcaklığına göre yönetir."""
+        option = endpoint.get("option")
+        mode = endpoint.get("mode")
+
+        # Preset: kombi entity'sindeki mantığın aynısı
+        if mode in AC_SCHEDULING_PRESETS:
+            self._attr_preset_mode = mode
+        elif option in AC_THERMOSTAT_PRESETS:
+            self._attr_preset_mode = option
+            self._attr_previous_preset_mode = option
+        elif self._attr_preset_mode == AC_PRESET_REMOTE:
+            # option "frozen" (klima kapalı) ve elimizde bir preset yok — örn. HA
+            # yeniden başladı. Cihaz termostatik modda olduğu için kumanda
+            # preset'inde kalmak yanlıştır: cihazın previousOption'ına, o da
+            # yoksa bilinen son preset'e dön. (Kombi entity'si de previousOption
+            # okuyarak aynı sorunu çözüyor.) previous_preset_mode'u da aynı
+            # değere çekiyoruz ki COOL'a dönüldüğünde (async_set_hvac_mode)
+            # gerçekten bu preset'e restore edilsin.
+            previous_option = endpoint.get("previousOption")
+            restored_preset = (
+                previous_option
+                if previous_option in AC_THERMOSTAT_PRESETS
+                else self._attr_previous_preset_mode
+            )
+            self._attr_preset_mode = restored_preset
+            self._attr_previous_preset_mode = restored_preset
+
+        if option == OPTION_FROZEN:
+            self._attr_hvac_mode = HVACMode.OFF
+            self._attr_hvac_action = HVACAction.OFF
+        else:
+            self._attr_hvac_mode = HVACMode.COOL
+            # Kumanda modunun aksine burada GERÇEK geri bildirim var:
+            # cihaz klimayı çalıştırdıysa acState "off" değildir
+            parsed = parse_ac_state(raw_ac_state)
+            running = parsed is not None and parsed[0] != AC_STATE_OFF
+            self._attr_hvac_action = HVACAction.COOLING if running else HVACAction.IDLE
+
+        if option in self._target_temperatures:
+            self._attr_target_temperature = self._target_temperatures[option]
+
+        # Fan hızı termostatik modda acSettings'ten gelir
+        ac_settings = endpoint.get("acSettings") or {}
+        fan_speed = ac_settings.get("fanSpeed")
+        if fan_speed in AC_FAN_MODES:
+            self._attr_fan_mode = fan_speed
+
+    def _process_remote_update(self, raw_ac_state: str | None) -> None:
+        """Kumanda modu: acState doğrudan klimanın durumudur."""
+        self._attr_preset_mode = AC_PRESET_REMOTE
+
+        parsed = parse_ac_state(raw_ac_state)
         if parsed is None:
             # API son gönderilen string'i echo'lar; tanınmayan değerlerde
             # (örn. eşleşmeyen ham komutlar) mod/fan/hedef durumunu koru
@@ -661,10 +716,7 @@ class CosaAirConditioner(CoordinatorEntity, ClimateEntity):
 
         ac_mode, fan, temp = parsed
 
-        if ac_mode == AC_STATE_OFF or operation_mode == OPERATION_MODE_HEATING:
-            # Klima kapalı veya cihaz kombi kontrolünde.
-            # (operationMode "remote" VE "cooling" klima-aktif modlardır;
-            # "cooling" cihazın termostatik klima kontrolüdür)
+        if ac_mode == AC_STATE_OFF:
             self._attr_hvac_mode = HVACMode.OFF
             self._attr_hvac_action = HVACAction.OFF
         elif ac_mode == AC_MODE_COOLING:
@@ -716,18 +768,84 @@ class CosaAirConditioner(CoordinatorEntity, ClimateEntity):
         if not success:
             raise HomeAssistantError(f"Failed to send AC command: {command}")
 
-    async def _ensure_remote_mode(self) -> None:
-        """Switch the device to remote (IR) operation mode.
+    async def _set_operation_mode(self, operation_mode: str) -> None:
+        """Cihazın çalışma modunu ayarla (cooling | remote).
 
         setOperationMode idempotenttir; coordinator verisi 10 sn'ye kadar
-        bayat olabileceğinden koşulsuz gönderilir.
+        bayat olabileceğinden koşulsuz gönderilir. operationMode alanı
+        olmayan (eski) cihazlara dokunulmaz.
         """
+        endpoint = (self.coordinator.data or {}).get("endpoint", {})
+        if endpoint.get("operationMode") is None:
+            return
         await async_api_post(
             self.hass,
             self._auth_token,
             API_SET_OPERATION_MODE,
-            {"endpoint": self._device_id, "operationMode": OPERATION_MODE_REMOTE},
+            {"endpoint": self._device_id, "operationMode": operation_mode},
         )
+
+    async def _ensure_remote_mode(self) -> None:
+        """Cihazı kumanda (IR) moduna geçir."""
+        await self._set_operation_mode(OPERATION_MODE_REMOTE)
+
+    async def _ensure_cooling_mode(self) -> None:
+        """Cihazı termostatik klima (cooling) moduna geçir."""
+        await self._set_operation_mode(OPERATION_MODE_COOLING)
+
+    async def _set_mode(self, mode: str) -> None:
+        """Zamanlama modunu ayarla: manual | auto | schedule."""
+        await async_api_post(
+            self.hass,
+            self._auth_token,
+            API_SET_MODE,
+            {"endpoint": self._device_id, "mode": mode},
+        )
+
+    async def _set_option(self, option: str) -> None:
+        """Konfor seçeneğini ayarla: home | away | sleep | custom | frozen."""
+        await async_api_post(
+            self.hass,
+            self._auth_token,
+            API_SET_OPTION,
+            {"endpoint": self._device_id, "option": option},
+        )
+
+    async def async_set_preset_mode(self, preset_mode: str) -> None:
+        """Set new preset mode.
+
+        "remote" kumanda (IR passthrough) modudur; diğerleri cihazın
+        termostatik klima kontrolünü açar.
+        """
+        if preset_mode not in AC_PRESET_MODES:
+            _LOGGER.error("Invalid AC preset mode: %s", preset_mode)
+            return
+
+        # Termostatik presetler operationMode alanı gerektirir; bu alanı
+        # olmayan (eski/kumanda-only) cihazlarda anlamsızdır ve cihazı
+        # honor edemeyeceği bir duruma sürüklerdi
+        if preset_mode != AC_PRESET_REMOTE:
+            endpoint = (self.coordinator.data or {}).get("endpoint", {})
+            if endpoint.get("operationMode") is None:
+                _LOGGER.error(
+                    "Cannot set thermostatic preset %s: device has no operationMode field",
+                    preset_mode,
+                )
+                return
+
+        if preset_mode == AC_PRESET_REMOTE:
+            await self._ensure_remote_mode()
+        else:
+            await self._ensure_cooling_mode()
+            if preset_mode in AC_SCHEDULING_PRESETS:
+                await self._set_mode(preset_mode)
+            else:
+                await self._set_mode("manual")
+                await self._set_option(preset_mode)
+                self._attr_previous_preset_mode = preset_mode
+
+        self._attr_preset_mode = preset_mode
+        await self._refresh_state()
 
     async def _refresh_state(self) -> None:
         """Give the API a moment to settle, then refresh."""
@@ -736,6 +854,42 @@ class CosaAirConditioner(CoordinatorEntity, ClimateEntity):
 
     async def async_set_hvac_mode(self, hvac_mode: str) -> None:
         """Set new hvac mode."""
+        if self._is_thermostat_mode:
+            if hvac_mode == HVACMode.OFF:
+                endpoint = (self.coordinator.data or {}).get("endpoint", {})
+                device_cooling = endpoint.get("operationMode") == OPERATION_MODE_COOLING
+                if not device_cooling:
+                    # Cihaz termostatik klima kontrolünde değil (örn. kombi
+                    # çalışıyor): klima zaten kapalı. Burada frozen göndermek
+                    # kombiyi kapatırdı — option/mode alanları ortaktır.
+                    _LOGGER.debug(
+                        "AC already off (operationMode is not cooling); skipping"
+                    )
+                    return
+                # Termostatik modda kapatma = frozen option (IR değil)
+                await self._set_option(OPTION_FROZEN)
+                await self._refresh_state()
+                return
+            if hvac_mode == HVACMode.COOL:
+                # option/mode alanları ortak olduğu için, bunları yazmadan
+                # önce cihazı koşulsuz olarak termostatik klima (cooling)
+                # moduna geçiriyoruz; aksi halde buradaki setMode/setOption
+                # kombiyi sürükleyebilir. setOperationMode idempotenttir ve
+                # coordinator verisi 10 sn'ye kadar bayat olabileceğinden,
+                # olası bayat veriye bakarak bu çağrıyı atlamıyoruz.
+                await self._ensure_cooling_mode()
+                preset = self._attr_previous_preset_mode
+                if preset not in AC_THERMOSTAT_PRESETS:
+                    preset = "home"
+                await self._set_mode("manual")
+                await self._set_option(preset)
+                self._attr_preset_mode = preset
+                await self._refresh_state()
+                return
+            # DRY / FAN_ONLY / HEAT termostatik modda yoktur; kumandaya geç
+            # ve komutu orada uygula (gizlemek yerine affedici davranış)
+            await self.async_set_preset_mode(AC_PRESET_REMOTE)
+
         if hvac_mode == HVACMode.OFF:
             await self._send_ir_command(AC_STATE_OFF)
         else:
@@ -757,6 +911,13 @@ class CosaAirConditioner(CoordinatorEntity, ClimateEntity):
 
     async def async_turn_on(self) -> None:
         """Turn the AC on, restoring the last active state if known."""
+        if self._is_thermostat_mode:
+            # Termostatik modda "son aktif komut" bir IR string'idir ve
+            # cihazın kendi kendine soğutmasıyla ilgisizdir; COOL moduna
+            # geçmek preset'i (ve dolayısıyla cihazı) yeniden başlatır
+            await self.async_set_hvac_mode(HVACMode.COOL)
+            return
+
         await self._ensure_remote_mode()
         command = self._last_active_command or self._build_command(AC_MODE_COOLING)
         await self._send_ir_command(command)
@@ -764,8 +925,7 @@ class CosaAirConditioner(CoordinatorEntity, ClimateEntity):
 
     async def async_turn_off(self) -> None:
         """Turn the AC off."""
-        await self._send_ir_command(AC_STATE_OFF)
-        await self._refresh_state()
+        await self.async_set_hvac_mode(HVACMode.OFF)
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set new target temperature."""
@@ -773,14 +933,24 @@ class CosaAirConditioner(CoordinatorEntity, ClimateEntity):
         if temperature is None:
             return
 
-        self._last_target_temp = temperature
-
         # climate.set_temperature isteğe bağlı hvac_mode ile gelebilir;
         # önce moda geç (komut saklanan yeni sıcaklıkla kurulur)
         requested_mode = kwargs.get(ATTR_HVAC_MODE)
         if requested_mode is not None and requested_mode != self._attr_hvac_mode:
+            self._last_target_temp = temperature
             await self.async_set_hvac_mode(requested_mode)
+            if self._is_thermostat_mode:
+                # Termostatik modda mod geçişi sıcaklığı yazmaz (setMode/
+                # setOption sıcaklık alanı içermez); burada gönderilmezse
+                # istenen sıcaklık sessizce kaybolur.
+                await self._async_set_thermostat_temperature(temperature)
             return
+
+        if self._is_thermostat_mode:
+            await self._async_set_thermostat_temperature(temperature)
+            return
+
+        self._last_target_temp = temperature
 
         if self._attr_hvac_mode == HVACMode.COOL:
             await self._send_ir_command(self._build_command(AC_MODE_COOLING, temp=temperature))
@@ -794,10 +964,51 @@ class CosaAirConditioner(CoordinatorEntity, ClimateEntity):
             self._attr_target_temperature = temperature
             self.async_write_ha_state()
 
+    async def _async_set_thermostat_temperature(self, temperature: float) -> None:
+        """Termostatik modda aktif preset'in hedef sıcaklığını yaz.
+
+        DİKKAT: preset sıcaklıkları kombi ile ORTAKTIR. Buradan yapılan
+        değişiklik kombinin aynı preset hedefini de değiştirir; Cosa'nın
+        kendi uygulaması da böyle davranır (ayrı bir soğutma hedefi yoktur).
+        """
+        preset = self._attr_preset_mode
+        if preset not in self._target_temperatures:
+            # auto/schedule preset'lerinde cihazın seçtiği aktif option kullanılır
+            endpoint = (self.coordinator.data or {}).get("endpoint", {})
+            preset = endpoint.get("option")
+        if preset not in self._target_temperatures:
+            _LOGGER.error(
+                "Cannot set AC temperature for preset %s (active option: %s)",
+                self._attr_preset_mode, preset
+            )
+            return
+
+        new_temperatures = {
+            k: v for k, v in self._target_temperatures.items() if v is not None
+        }
+        new_temperatures[preset] = temperature
+
+        success = await async_api_post(
+            self.hass,
+            self._auth_token,
+            API_SET_TARGET_TEMPERATURES,
+            {"endpoint": self._device_id, "targetTemperatures": new_temperatures},
+        )
+        if not success:
+            raise HomeAssistantError(f"Failed to set AC target temperature: {temperature}")
+
+        self._target_temperatures[preset] = temperature
+        self._attr_target_temperature = temperature
+        await self._refresh_state()
+
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         """Set new fan mode."""
         if fan_mode not in AC_FAN_MODES:
             _LOGGER.error("Invalid fan mode: %s", fan_mode)
+            return
+
+        if self._is_thermostat_mode:
+            await self._async_set_thermostat_fan_speed(fan_mode)
             return
 
         self._last_fan_mode = fan_mode
@@ -813,5 +1024,32 @@ class CosaAirConditioner(CoordinatorEntity, ClimateEntity):
             self._attr_fan_mode = fan_mode
             self.async_write_ha_state()
 
+    async def _async_set_thermostat_fan_speed(self, fan_mode: str) -> None:
+        """Termostatik modda cihazın kullandığı fan hızını acSettings'e yaz.
 
-   
+        setACSettings tam nesne bekler (eksik alan -> code 157) ve hiçbir
+        doğrulama yapmaz; fan_mode çağrılmadan önce allowlist'ten geçmiştir.
+        """
+        endpoint = (self.coordinator.data or {}).get("endpoint", {})
+        ac_settings = endpoint.get("acSettings")
+        if not ac_settings:
+            _LOGGER.error("Cannot set AC fan speed: acSettings unavailable")
+            return
+
+        payload = {
+            k: v for k, v in ac_settings.items()
+            if k not in AC_SETTINGS_READ_ONLY_KEYS
+        }
+        payload["fanSpeed"] = fan_mode
+
+        success = await async_api_post(
+            self.hass,
+            self._auth_token,
+            API_SET_AC_SETTINGS,
+            {"endpoint": self._device_id, "acSettings": payload},
+        )
+        if not success:
+            raise HomeAssistantError(f"Failed to set AC fan speed: {fan_mode}")
+
+        self._attr_fan_mode = fan_mode
+        await self._refresh_state()
